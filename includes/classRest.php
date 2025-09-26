@@ -30,6 +30,7 @@ class ConvertoRest {
     public function getTemplateData( $request ) {
         $id = (int) $request['id'];
         $elementorData = get_post_meta( $id, '_elementor_data', true );
+        $pageSettings  = get_post_meta( $id, '_elementor_page_settings', true ); // 👈 novo
     
         if ( ! $elementorData ) {
             return new WP_Error( 'no_data', 'Template não encontrado', [ 'status' => 404 ] );
@@ -50,8 +51,8 @@ class ConvertoRest {
             'content_type'  => $type,
             'subtype'       => '',
             'version'       => ELEMENTOR_VERSION,
-            'content'       => $content,         // ✅ direto, igual no lgr.builder.php
-            'page_settings' => new \stdClass(),
+            'content'       => $content,
+            'page_settings' => $pageSettings ?: new \stdClass(),
             'metadata'      => new \stdClass(),
         ];
     }
