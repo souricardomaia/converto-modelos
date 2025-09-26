@@ -25,6 +25,9 @@ class ConvertoCustomCss {
 
         // Processa CSS personalizado da página
         add_action( 'elementor/css-file/post/parse', [ $this, 'customCssAddPageSettings' ] );
+
+        // Injetar script para live preview no editor
+        add_action( 'elementor/preview/enqueue_scripts', [ $this, 'enqueuePreviewScripts' ] );
     }
 
     /**
@@ -113,5 +116,50 @@ class ConvertoCustomCss {
 
         $custom_css = str_replace( 'selector', $document->get_css_wrapper_selector(), $custom_css );
         $post_css->get_stylesheet()->add_raw_css( $custom_css );
+    }
+
+    /**
+     * Injeta script para atualizar CSS em tempo real no preview
+     */
+    public function enqueuePreviewScripts() {
+        ?>
+        <script>
+        jQuery(window).on('elementor:init', function() {
+            // Atualização em tempo real para elementos (widgets/seções)
+            elementor.hooks.addAction('panel/open_editor/widget', function(panel, model, view){
+                model.on('change:settings', function() {
+                    if (model.changed && model.changed.custom_css !== undefined) {
+                        var css = model.get('settings').get('custom_css');
+                        var id  = model.get('id');
+                        var styleId = 'converto-custom-css-' + id;
+
+                        jQuery('#' + styleId).remove();
+
+                        if (css && css.length > 0) {
+                            css = css.replace(/selector/g, '.elementor-element.elementor-element-' + id);
+                            jQuery('<style>', { id: styleId, text: css }).appendTo('head');
+                        }
+                    }
+                });
+            });
+
+            // Atualização em tempo real para CSS da página
+            elementor.channels.editor.on('change:document:settings', function(model) {
+                if (model.changed && model.changed.custom_css !== undefined) {
+                    var css = model.get('custom_css') || '';
+                    var styleId = 'converto-custom-css-page';
+
+                    jQuery('#' + styleId).remove();
+
+                    if (css && css.length > 0) {
+                        var wrapper = elementor.settings.page.model.get('cssWrapperSelector') || 'body';
+                        css = css.replace(/selector/g, wrapper);
+                        jQuery('<style>', { id: styleId, text: css }).appendTo('head');
+                    }
+                }
+            });
+        });
+        </script>
+        <?php
     }
 }
