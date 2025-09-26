@@ -26,8 +26,8 @@ class ConvertoCustomCss {
         // Processa CSS personalizado da página
         add_action( 'elementor/css-file/post/parse', [ $this, 'customCssAddPageSettings' ] );
 
-        // Injetar script para live preview no editor
-        add_action( 'elementor/preview/enqueue_scripts', [ $this, 'enqueuePreviewScripts' ] );
+        // Enfileira script de live preview no editor Elementor
+        add_action( 'elementor/editor/after_enqueue_scripts', [ $this, 'enqueuePreviewAssets' ] );
     }
 
     /**
@@ -118,69 +118,22 @@ class ConvertoCustomCss {
     }
 
     /**
-     * Injeta script para atualizar/aplicar CSS em tempo real no preview
+     * Enfileira o script de preview em tempo real do Custom CSS
      */
-    public function enqueuePreviewScripts() {
-        ?>
-        <script>
-        jQuery(window).on('elementor:init', function() {
-            elementor.on('preview:loaded', function() {
-                var $head = elementor.$previewContents.find('head');
+    public function enqueuePreviewAssets() {
+        wp_enqueue_script(
+            'converto-modelos-preview',
+            CONVERTO_MODELOS_URL . 'assets/js/livePreview.js',
+            ['jquery', 'elementor-editor'],
+            '1.0',
+            true
+        );
 
-                // 🔹 1. Aplicar CSS já existente em widgets/seções
-                elementor.elements.each(function(model) {
-                    var css = model.get('settings')?.get('custom_css');
-                    if (css && css.length > 0) {
-                        var id = model.get('id');
-                        var styleId = 'converto-custom-css-' + id;
-                        $head.find('#' + styleId).remove();
-                        css = css.replace(/selector/g, '.elementor-element.elementor-element-' + id);
-                        jQuery('<style>', { id: styleId, text: css }).appendTo($head);
-                    }
-                });
-
-                // 🔹 2. Aplicar CSS já existente da página
-                var pageCss = elementor.settings.page.model.get('custom_css');
-                if (pageCss && pageCss.length > 0) {
-                    var styleId = 'converto-custom-css-page';
-                    $head.find('#' + styleId).remove();
-                    var wrapper = elementor.settings.page.model.get('cssWrapperSelector') || 'body';
-                    pageCss = pageCss.replace(/selector/g, wrapper);
-                    jQuery('<style>', { id: styleId, text: pageCss }).appendTo($head);
-                }
-
-                // 🔹 3. Atualização em tempo real para widgets/seções
-                elementor.hooks.addAction('panel/open_editor/widget', function(panel, model, view){
-                    model.on('change:settings', function() {
-                        if (model.changed && model.changed.custom_css !== undefined) {
-                            var css = model.get('settings').get('custom_css');
-                            var id  = model.get('id');
-                            var styleId = 'converto-custom-css-' + id;
-                            $head.find('#' + styleId).remove();
-                            if (css && css.length > 0) {
-                                css = css.replace(/selector/g, '.elementor-element.elementor-element-' + id);
-                                jQuery('<style>', { id: styleId, text: css }).appendTo($head);
-                            }
-                        }
-                    });
-                });
-
-                // 🔹 4. Atualização em tempo real para CSS da página
-                elementor.channels.editor.on('change:document:settings', function(model) {
-                    if (model.changed && model.changed.custom_css !== undefined) {
-                        var css = model.get('custom_css') || '';
-                        var styleId = 'converto-custom-css-page';
-                        $head.find('#' + styleId).remove();
-                        if (css && css.length > 0) {
-                            var wrapper = elementor.settings.page.model.get('cssWrapperSelector') || 'body';
-                            css = css.replace(/selector/g, wrapper);
-                            jQuery('<style>', { id: styleId, text: css }).appendTo($head);
-                        }
-                    }
-                });
-            });
-        });
-        </script>
-        <?php
+        wp_enqueue_style(
+            'converto-modelos-builder',
+            CONVERTO_MODELOS_URL . 'assets/css/builder.css',
+            [],
+            '1.0'
+        );
     }
 }

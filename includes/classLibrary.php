@@ -33,7 +33,7 @@ class ConvertoLibrary {
             // Thumbnail individual de cada post
             $thumbnail = get_the_post_thumbnail_url( $post->ID, 'medium' );
             if ( ! $thumbnail ) {
-                $thumbnail = CONVERTO_MODELOS_URL . 'assets/thumbnail.png';
+                $thumbnail = CONVERTO_MODELOS_URL . 'assets/images/thumbnail.png';
             }
 
             // Termos

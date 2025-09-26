@@ -1,0 +1,5 @@
+/* Esconde upsells e banners do Elementor Free */
+.elementor-nerd-box.elementor-nerd-box--upsale,
+#elementor-panel-get-pro-elements-sticky {
+    display: none !important;
+}
