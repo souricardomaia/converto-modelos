@@ -3,7 +3,7 @@ name: Deploy via FTP
 on:
   push:
     branches:
-      - main   # dispara o deploy sempre que fizer push na branch main
+      - main
 
 jobs:
   ftp-deploy:
@@ -20,5 +20,5 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           protocol: ftp
           port: 21
-          local-dir: ./   # pasta local (a raiz do repositório)
-          server-dir: /public_html/wp-content/plugins/converto-modelos
+          local-dir: ./   # envia a raiz do repositório (ajuste se quiser só uma pasta)
+          server-dir: /public_html/wp-content/plugins/converto-modelos/
