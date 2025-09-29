@@ -22,7 +22,7 @@ class ConvertoMeta {
         foreach ( $screens as $screen ) {
             add_meta_box(
                 'converto_is_pro',
-                __( 'Disponibilidade', 'converto-modelos' ),
+                __( 'Exclusivo', 'converto-modelos' ),
                 [ $this, 'renderMetabox' ],
                 $screen,
                 'side',
@@ -47,7 +47,7 @@ class ConvertoMeta {
             </label>
         </p>
         <p class="description">
-            <?php _e( 'Somente clientes ativos podem baixar este template', 'converto-modelos' ); ?>
+            <?php _e( 'Somente clientes ativos podem baixar este modelo', 'converto-modelos' ); ?>
         </p>
         <?php
     }
