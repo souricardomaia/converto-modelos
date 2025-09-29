@@ -6,24 +6,24 @@ use Elementor\Controls_Manager;
 class ConvertoCustomJs {
 
     public function __construct() {
-        // Aba "JS Personalizado"
-        add_action( 'elementor/element/after_section_end', [ $this, 'customJsControlSection' ], 20, 3 );
+        // Adiciona controles de JS em widgets/seções
+        add_action( 'elementor/element/after_section_end', [ $this, 'customJsControlSection' ], 10, 3 );
 
-        // Injetar atributo nos elementos no frontend
-        add_action( 'elementor/frontend/element/before_render', [ $this, 'injectElementJsAttr' ] );
+        // Adiciona controle de JS nas configurações da página
+        add_action( 'elementor/documents/register_controls', [ $this, 'registerPageJsControl' ] );
 
-        // Injetar atributo para page settings
-        add_action( 'elementor/frontend/before_render', [ $this, 'injectPageJsAttr' ] );
+        // Marca elementos com JS antes do render
+        add_action( 'elementor/frontend/before_render', [ $this, 'beforeRender' ] );
 
-        // Script executor no frontend
-        add_action( 'wp_footer', [ $this, 'enqueueFrontend' ], 99 );
+        // Injeta executor no footer
+        add_action( 'wp_footer', [ $this, 'printExecutor' ], 99 );
     }
 
     /**
-     * Adiciona a aba "JS" no painel do Elementor
+     * Cria a aba "JS Personalizado" nos elementos
      */
     public function customJsControlSection( $element, $section_id, $args ) {
-        if ( $section_id === 'section_custom_css' ) {
+        if ( $section_id === 'section_custom_css_pro' ) {
             $element->start_controls_section(
                 'section_custom_js',
                 [
@@ -38,9 +38,8 @@ class ConvertoCustomJs {
                     'type'        => Controls_Manager::CODE,
                     'label'       => __( 'JavaScript', 'converto-modelos' ),
                     'language'    => 'javascript',
-                    'render_type' => 'none',
+                    'render_type' => 'ui',
                     'show_label'  => false,
-                    'separator'   => 'none',
                 ]
             );
 
@@ -49,52 +48,88 @@ class ConvertoCustomJs {
     }
 
     /**
-     * Injeta o atributo data-custom-js nos elementos individuais
+     * Adiciona controle de JS nas configurações da página
      */
-    public function injectElementJsAttr( $element ) {
+    public function registerPageJsControl( $document ) {
+        $document->start_controls_section(
+            'section_page_custom_js',
+            [
+                'label' => __( 'JS Personalizado', 'converto-modelos' ),
+                'tab'   => Controls_Manager::TAB_SETTINGS,
+            ]
+        );
+
+        $document->add_control(
+            'custom_js',
+            [
+                'type'        => Controls_Manager::CODE,
+                'label'       => __( 'JavaScript da Página', 'converto-modelos' ),
+                'language'    => 'javascript',
+                'render_type' => 'none',
+                'show_label'  => false,
+            ]
+        );
+
+        $document->end_controls_section();
+    }
+
+    /**
+     * Antes de renderizar, marca o elemento com atributo data-custom-js
+     */
+    public function beforeRender( $element ) {
         $settings = $element->get_settings_for_display();
         if ( empty( $settings['custom_js'] ) ) return;
 
-        $custom_js = trim( $settings['custom_js'] );
-        if ( empty( $custom_js ) ) return;
+        $code = trim( $settings['custom_js'] );
+        if ( ! $code ) return;
 
-        $element->add_render_attribute( '_wrapper', 'data-custom-js', base64_encode( $custom_js ) );
+        // Codifica para evitar conflitos
+        $encoded = base64_encode( $code );
+        $element->add_render_attribute( '_wrapper', 'data-custom-js', $encoded );
     }
 
     /**
-     * Injeta para page settings
+     * Imprime executor no footer do site
      */
-    public function injectPageJsAttr( $element ) {
-        if ( ! method_exists( $element, 'get_settings' ) ) return;
-
-        $custom_js = trim( $element->get_settings( 'custom_js' ) );
-        if ( empty( $custom_js ) ) return;
-
-        echo '<div data-custom-js="' . esc_attr( base64_encode( $custom_js ) ) . '"></div>';
-    }
-
-    /**
-     * Script executor no frontend
-     */
-    public function enqueueFrontend() {
+    public function printExecutor() {
+        // Coleta JS da página atual
+        $pageJs = '';
+        if ( function_exists( 'elementor_theme_do_location' ) ) {
+            $doc = \Elementor\Plugin::$instance->documents->get( get_the_ID() );
+            if ( $doc ) {
+                $pageJs = trim( $doc->get_settings( 'custom_js' ) );
+            }
+        }
         ?>
         <script>
         (function($){
-            "use strict";
             $(function(){
+                // JS por elemento
                 $('[data-custom-js]').each(function(){
-                    var $el = $(this);
-                    var encoded = $el.data('custom-js');
-                    if (!encoded) return;
+                    const $el = $(this);
+                    if ($el.data('js-ran')) return;
+                    $el.data('js-ran', true);
+
                     try {
-                        var code = atob(encoded);
+                        const code = atob($el.data('custom-js'));
                         (function(selector,$){
                             eval(code);
                         })($el, jQuery);
-                    } catch (e) {
+                    } catch(e){
                         console.error("Erro no Custom JS:", e);
                     }
                 });
+
+                // JS de página inteira
+                <?php if ( ! empty( $pageJs ) ) : ?>
+                try {
+                    (function($){
+                        <?php echo $pageJs; // ⚠️ Inserido cru, porque o autor controla ?>
+                    })(jQuery);
+                } catch(e){
+                    console.error("Erro no Custom JS da Página:", e);
+                }
+                <?php endif; ?>
             });
         })(jQuery);
         </script>
