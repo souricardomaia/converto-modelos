@@ -21,10 +21,7 @@
 
     if (model.get("elType") === "document") {
       selector =
-        (elementor.config &&
-          elementor.config.document &&
-          elementor.config.document.settings &&
-          elementor.config.document.settings.cssWrapperSelector) ||
+        (elementor.config?.document?.settings?.cssWrapperSelector) ||
         (elementor.settings?.page?.model?.get("cssWrapperSelector")) ||
         "body";
     }
@@ -65,7 +62,6 @@
       var v = elementor.getView(model.id);
       if (v && v.$el) return v;
     }
-    // Fallback: tenta localizar via filhos do painel
     try {
       var v2 = elementor.getPanelView()?.children?.find(function(v){
         return v.model && v.model.id === model.id;
@@ -78,40 +74,22 @@
   ///////////////////////////////
   // 🔹 EXECUÇÃO DO JS
   ///////////////////////////////
-  function runCustomJsFromAttr($root) {
-    $root.find("[data-custom-js]").each(function () {
-      var $el = $(this);
-      if ($el.data("js-ran")) return;
-      var encoded = $el.attr("data-custom-js");
-      if (!encoded) return;
-
-      saveBaseline($el);
-      resetBaseline($el);
-
-      try {
-        var code = atob(encoded);
-        (function (selector, $) { eval(code); })($el, jQuery);
-        $el.data("js-ran", true);
-      } catch (e) {
-        console.error("Erro no Custom JS (preview via data-custom-js):", e);
-      }
-    });
-  }
-
   function runCustomJsFromSettings(model, viewFromHook) {
     if (!model) return;
 
     var settings = model.get("settings");
-    var code = (settings.get("custom_js") || "").trim();
+    var code = (settings.get("custom_js") || "");
     var view = getView(model, viewFromHook);
     if (!view || !view.$el) return;
 
     var $el = view.$el;
 
+    // baseline
     saveBaseline($el);
     resetBaseline($el);
 
-    if (!code) return;
+    // se campo está vazio → só reset
+    if (!code.trim()) return;
 
     try {
       (function (selector, $) {
@@ -119,22 +97,20 @@
       })($el, jQuery);
       $el.data("js-ran", true);
     } catch (e) {
-      console.error("Erro no Custom JS (preview via settings):", e);
+      console.error("Erro no Custom JS:", e);
     }
   }
 
   function refreshCustomJs(panel, model, view) {
     if (!model) return;
-    var timeout;
-    var run = function(){ runCustomJsFromSettings(model, view); };
+    let timeout;
+    const run = () => runCustomJsFromSettings(model, view);
 
-    // roda imediatamente ao abrir o painel
-    run();
+    run(); // roda imediatamente
 
-    // reexecuta sempre que o campo mudar (com debounce)
     model.get("settings")
       .off("change:custom_js.cm")
-      .on("change:custom_js.cm", function(){
+      .on("change:custom_js.cm", function () {
         clearTimeout(timeout);
         timeout = setTimeout(run, 400);
       });
@@ -144,40 +120,29 @@
   // 🔹 INIT
   ///////////////////////////////
   function bindFilters() {
-    if (!(elementor && elementor.hooks && typeof elementor.hooks.addFilter === "function")) {
-      return false;
-    }
-    if (!bindFilters._bound) {
-      // CSS
-      elementor.hooks.addFilter("editor/style/styleText", customCSSFilter);
+    if (!(elementor?.hooks?.addFilter)) return false;
+    if (bindFilters._bound) return true;
 
-      // JS (vários tipos de elementos)
-      ["widget", "section", "column", "container", "document"].forEach(function(type){
-        elementor.hooks.addAction("panel/open_editor/" + type, refreshCustomJs);
-      });
+    elementor.hooks.addFilter("editor/style/styleText", customCSSFilter);
 
-      bindFilters._bound = true;
-    }
+    ["widget", "section", "column", "container", "document"].forEach(function(type){
+      elementor.hooks.addAction("panel/open_editor/" + type, refreshCustomJs);
+    });
+
+    bindFilters._bound = true;
     return true;
   }
 
   function onPreviewLoaded() {
-    var $doc = elementor.$previewContents || $(document);
-
-    // 1) executa qualquer data-custom-js já renderizado
-    runCustomJsFromAttr($doc);
-
-    // 2) executa para modelos que já têm código (e reseta quando vazio)
     (elementor.elements?.models || []).forEach(function(model){
-      var code = model.get("settings")?.get("custom_js");
-      if (code !== undefined) {
-        runCustomJsFromSettings(model, null);
-      }
+      runCustomJsFromSettings(model, null);
     });
   }
 
   function boot() {
     if (bindFilters()) {
+      // roda já no boot (não espera só o evento)
+      onPreviewLoaded();
       elementor.on("preview:loaded", onPreviewLoaded);
       return;
     }
@@ -185,6 +150,7 @@
     var t = setInterval(function () {
       tries++;
       if (bindFilters()) {
+        onPreviewLoaded();
         elementor.on("preview:loaded", onPreviewLoaded);
         clearInterval(t);
       }
