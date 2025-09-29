@@ -2,24 +2,18 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 use Elementor\Controls_Manager;
+use Elementor\Core\DynamicTags\Dynamic_CSS;
 
-/**
- * Classe responsável por adicionar suporte a JS personalizado
- * em widgets, seções e configurações de página dentro do Elementor Free.
- *
- * O JS é salvo em:
- * - _elementor_data (widgets/seções)
- * - _elementor_page_settings (configurações da página)
- *
- * E já é exportado/importado pelo Converto Modelos.
- */
 class ConvertoCustomJs {
 
     public function __construct() {
         // Adiciona controles de JS em widgets/seções
         add_action( 'elementor/element/after_section_end', [ $this, 'customJsControlSection' ], 20, 3 );
 
-        // Processa JS personalizado da página
+        // Processa JS dos elementos individuais
+        add_action( 'elementor/element/parse_css', [ $this, 'customJsAddElement' ], 20, 2 );
+
+        // Processa JS da página
         add_action( 'elementor/css-file/post/parse', [ $this, 'customJsAddPageSettings' ] );
 
         // Executa JS no frontend
@@ -27,10 +21,10 @@ class ConvertoCustomJs {
     }
 
     /**
-     * Cria a aba de "JS Personalizado" em widgets e seções
+     * Cria aba "JS Personalizado"
      */
     public function customJsControlSection( $element, $section_id, $args ) {
-        if ( $section_id === 'section_custom_css' ) { // insere logo depois do CSS
+        if ( $section_id === 'section_custom_css' ) {
             $element->start_controls_section(
                 'section_custom_js',
                 [
@@ -40,31 +34,14 @@ class ConvertoCustomJs {
             );
 
             $element->add_control(
-                'custom_js_title',
-                [
-                    'raw'  => __( 'Insira seu código JavaScript personalizado', 'converto-modelos' ),
-                    'type' => Controls_Manager::RAW_HTML,
-                ]
-            );
-
-            $element->add_control(
                 'custom_js',
                 [
                     'type'        => Controls_Manager::CODE,
-                    'label'       => __( 'JS', 'converto-modelos' ),
+                    'label'       => __( 'JavaScript', 'converto-modelos' ),
                     'language'    => 'javascript',
                     'render_type' => 'none',
                     'show_label'  => false,
                     'separator'   => 'none',
-                ]
-            );
-
-            $element->add_control(
-                'custom_js_description',
-                [
-                    'raw'             => __( 'O código será executado dentro de uma função com acesso ao elemento atual como "selector".', 'converto-modelos' ),
-                    'type'            => Controls_Manager::RAW_HTML,
-                    'content_classes' => 'elementor-descriptor',
                 ]
             );
 
@@ -73,14 +50,26 @@ class ConvertoCustomJs {
     }
 
     /**
-     * Aplica JS personalizado salvo nas configurações da página
-     * (injeção no HTML como atributo data-custom-js para o preview rodar)
+     * Salva JS personalizado nos widgets/seções
+     */
+    public function customJsAddElement( $post_css, $element ) {
+        $settings = $element->get_settings();
+        if ( empty( $settings['custom_js'] ) ) return;
+
+        $custom_js = trim( $settings['custom_js'] );
+        if ( empty( $custom_js ) ) return;
+
+        // injeta como atributo para o frontend rodar
+        $element->add_render_attribute( '_wrapper', 'data-custom-js', base64_encode( $custom_js ) );
+    }
+
+    /**
+     * Salva JS personalizado nas configs da página
      */
     public function customJsAddPageSettings( $post_css ) {
         $document   = \Elementor\Plugin::$instance->documents->get( $post_css->get_post_id() );
-        if ( ! $document ) return;
+        $custom_js  = trim( $document->get_settings( 'custom_js' ) );
 
-        $custom_js = trim( $document->get_settings( 'custom_js' ) );
         if ( empty( $custom_js ) ) return;
 
         add_filter( 'elementor/frontend/the_content', function( $content ) use ( $custom_js ) {
@@ -90,21 +79,18 @@ class ConvertoCustomJs {
     }
 
     /**
-     * Injeta suporte no frontend (widgets/seções)
+     * Executor no frontend
      */
     public function enqueueFrontend() {
         ?>
         <script>
         (function($){
             "use strict";
-
-            // roda para elementos com atributo data-custom-js
             $(function(){
                 $('[data-custom-js]').each(function(){
                     const $el = $(this);
                     const encoded = $el.data('custom-js');
                     if (!encoded) return;
-
                     try {
                         const code = atob(encoded);
                         (function(selector,$){
