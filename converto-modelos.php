@@ -18,6 +18,7 @@ require_once CONVERTO_MODELOS_PATH . 'includes/classRest.php';
 require_once CONVERTO_MODELOS_PATH . 'includes/classExport.php';
 require_once CONVERTO_MODELOS_PATH . 'includes/classPreview.php';
 require_once __DIR__ . '/includes/classCustomCss.php';
+require_once __DIR__ . '/includes/classCustomJs.php';
 
 add_action( 'init', function() {
     (new ConvertoCpt())->register();
@@ -35,6 +36,7 @@ add_action( 'plugins_loaded', function() {
     (new ConvertoExport())->boot();
     (new ConvertoPreview())->boot();
     new ConvertoCustomCss();
+    new ConvertoCustomJs();
 } );
 
 add_action('rest_api_init', function() {
