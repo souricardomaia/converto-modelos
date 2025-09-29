@@ -54,6 +54,7 @@ class ConvertoRest {
             'content'       => $content,
             'page_settings' => $pageSettings ?: new \stdClass(),
             'metadata'      => new \stdClass(),
+            'is_pro' => ConvertoMeta::getIsPro( $id ),
         ];
     }
 

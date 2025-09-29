@@ -56,7 +56,8 @@ class ConvertoLibrary {
                 'preview_url' => home_url( '/preview/' . $post->ID ),
                 'file' => rest_url( 'converto-modelos/v1/getTemplateData/' . $post->ID ),
                 'tags'        => $tags,
-                'favorite'    => false
+                'favorite'    => false,
+                'is_pro'      => ConvertoMeta::getIsPro( $post->ID ),
             ];
         }
 

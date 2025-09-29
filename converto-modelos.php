@@ -19,6 +19,7 @@ require_once CONVERTO_MODELOS_PATH . 'includes/classExport.php';
 require_once CONVERTO_MODELOS_PATH . 'includes/classPreview.php';
 require_once __DIR__ . '/includes/classCustomCss.php';
 require_once __DIR__ . '/includes/classCustomJs.php';
+require_once __DIR__ . '/includes/classMeta.php';
 
 add_action( 'init', function() {
     (new ConvertoCpt())->register();
@@ -37,6 +38,7 @@ add_action( 'plugins_loaded', function() {
     (new ConvertoPreview())->boot();
     new ConvertoCustomCss();
     new ConvertoCustomJs();
+    new ConvertoMeta();
 } );
 
 add_action('rest_api_init', function() {
