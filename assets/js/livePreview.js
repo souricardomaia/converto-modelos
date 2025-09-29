@@ -21,10 +21,7 @@
 
     if (model.get("elType") === "document") {
       selector =
-        (elementor.config &&
-          elementor.config.document &&
-          elementor.config.document.settings &&
-          elementor.config.document.settings.cssWrapperSelector) ||
+        (elementor.config?.document?.settings?.cssWrapperSelector) ||
         (elementor.settings?.page?.model?.get("cssWrapperSelector")) ||
         "body";
     }
@@ -35,14 +32,18 @@
   ///////////////////////////////
   // 🔹 JS PERSONALIZADO
   ///////////////////////////////
-  function runCustomJs(model, view) {
-    if (!model || !view) return;
+  function runCustomJs(model) {
+    if (!model) return;
 
     const settings = model.get("settings");
     const code = (settings.get("custom_js") || "").trim();
-    const $selector = view.$el;
-
     if (!code) return;
+
+    // tenta pegar a view renderizada
+    const view = elementor.getView(model.id);
+    if (!view || !view.$el) return;
+
+    const $selector = view.$el;
 
     try {
       (function (selector, $) {
@@ -50,16 +51,17 @@
       })($selector, jQuery);
       $selector.data("js-ran", true);
     } catch (e) {
-      console.error("Erro no Custom JS:", e);
+      console.error("Erro no Custom JS:", e, code);
     }
   }
 
-  function refreshCustomJs(panel, model, view) {
-    if (!model || !view) return;
+  function refreshCustomJs(panel, model) {
+    if (!model) return;
     let timeout;
-    const run = () => runCustomJs(model, view);
 
-    // roda imediatamente ao abrir o painel
+    const run = () => runCustomJs(model);
+
+    // roda imediatamente ao abrir
     run();
 
     // reexecuta sempre que o campo mudar (com debounce)
@@ -73,14 +75,12 @@
   // 🔹 INIT
   ///////////////////////////////
   function bindFilters() {
-    if (!(elementor && elementor.hooks && typeof elementor.hooks.addFilter === "function")) {
-      return false;
-    }
+    if (!(elementor?.hooks?.addFilter)) return false;
     if (!bindFilters._bound) {
       // CSS
       elementor.hooks.addFilter("editor/style/styleText", customCSSFilter);
 
-      // JS (vários tipos de elementos)
+      // JS: quando abre o painel de edição
       ["widget", "section", "column", "container", "document"].forEach((type) => {
         elementor.hooks.addAction("panel/open_editor/" + type, refreshCustomJs);
       });
@@ -91,16 +91,12 @@
   }
 
   function onPreviewLoaded() {
-    // executa em todos os elementos que já têm custom_js
+    // roda JS de todos os elementos que já têm código
     elementor.elements?.models?.forEach((model) => {
       const code = model.get("settings")?.get("custom_js");
-      if (!code || !code.trim()) return;
-
-      // pega a view do modelo de forma mais segura
-      const view = elementor.getView(model.id);
-      if (!view) return;
-
-      runCustomJs(model, view);
+      if (code && code.trim()) {
+        runCustomJs(model);
+      }
     });
   }
 

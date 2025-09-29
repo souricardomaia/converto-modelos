@@ -13,7 +13,7 @@ class ConvertoCustomJs {
         add_action( 'elementor/documents/register_controls', [ $this, 'registerPageJsControl' ] );
 
         // Marca elementos com JS antes do render (corrigido para rodar no frontend publicado também)
-        add_action( 'elementor/frontend/element/before_render', [ $this, 'beforeRender' ] );
+        add_action( 'elementor/frontend/element/before_render', [ $this, 'beforeRender' ], 10, 1 );
 
         // Injeta executor no footer
         add_action( 'wp_footer', [ $this, 'printExecutor' ], 99 );
