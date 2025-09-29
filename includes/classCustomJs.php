@@ -12,8 +12,8 @@ class ConvertoCustomJs {
         // Adiciona controle de JS nas configurações da página
         add_action( 'elementor/documents/register_controls', [ $this, 'registerPageJsControl' ] );
 
-        // Marca elementos com JS antes do render
-        add_action( 'elementor/frontend/before_render', [ $this, 'beforeRender' ] );
+        // Marca elementos com JS antes do render (corrigido para rodar no frontend publicado também)
+        add_action( 'elementor/frontend/element/before_render', [ $this, 'beforeRender' ] );
 
         // Injeta executor no footer
         add_action( 'wp_footer', [ $this, 'printExecutor' ], 99 );
@@ -97,7 +97,8 @@ class ConvertoCustomJs {
         if ( function_exists( 'elementor_theme_do_location' ) ) {
             $doc = \Elementor\Plugin::$instance->documents->get( get_the_ID() );
             if ( $doc ) {
-                $pageJs = trim( $doc->get_settings( 'custom_js' ) );
+                // Usar get_meta() para garantir que o campo custom_js da página seja recuperado no frontend
+                $pageJs = trim( $doc->get_meta( 'custom_js' ) );
             }
         }
         ?>
@@ -124,7 +125,7 @@ class ConvertoCustomJs {
                 <?php if ( ! empty( $pageJs ) ) : ?>
                 try {
                     (function($){
-                        <?php echo $pageJs; // ⚠️ Inserido cru, porque o autor controla ?>
+                        <?php echo $pageJs; ?>
                     })(jQuery);
                 } catch(e){
                     console.error("Erro no Custom JS da Página:", e);

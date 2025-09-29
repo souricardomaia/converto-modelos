@@ -96,9 +96,8 @@
       const code = model.get("settings")?.get("custom_js");
       if (!code || !code.trim()) return;
 
-      const view = elementor.getPanelView()?.children?.find(
-        (v) => v.model && v.model.id === model.id
-      );
+      // pega a view do modelo de forma mais segura
+      const view = elementor.getView(model.id);
       if (!view) return;
 
       runCustomJs(model, view);
