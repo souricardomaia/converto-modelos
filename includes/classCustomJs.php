@@ -8,7 +8,7 @@ use Elementor\Controls_Manager;
  * em widgets, seções e configurações de página dentro do Elementor Free.
  *
  * O JS é salvo em:
- * - _elementor_data (widgets e seções)
+ * - _elementor_data (widgets/seções)
  * - _elementor_page_settings (configurações da página)
  *
  * E já é exportado/importado pelo Converto Modelos.
@@ -17,20 +17,20 @@ class ConvertoCustomJs {
 
     public function __construct() {
         // Adiciona controles de JS em widgets/seções
-        add_action( 'elementor/element/after_section_end', [ $this, 'customJsControlSection' ], 10, 3 );
+        add_action( 'elementor/element/after_section_end', [ $this, 'customJsControlSection' ], 20, 3 );
 
-        // Adiciona controle de JS nas configurações da página
-        add_action( 'elementor/documents/register_controls', [ $this, 'addPageSettingsControl' ] );
+        // Processa JS personalizado da página
+        add_action( 'elementor/css-file/post/parse', [ $this, 'customJsAddPageSettings' ] );
 
-        // Injeta o JS coletado no frontend
-        add_action( 'wp_footer', [ $this, 'printCollectedJs' ], 100 );
+        // Executa JS no frontend
+        add_action( 'elementor/frontend/after_enqueue_scripts', [ $this, 'enqueueFrontend' ] );
     }
 
     /**
      * Cria a aba de "JS Personalizado" em widgets e seções
      */
     public function customJsControlSection( $element, $section_id, $args ) {
-        if ( $section_id === 'section_custom_css_pro' ) {
+        if ( $section_id === 'section_custom_css' ) { // insere logo depois do CSS
             $element->start_controls_section(
                 'section_custom_js',
                 [
@@ -42,7 +42,7 @@ class ConvertoCustomJs {
             $element->add_control(
                 'custom_js_title',
                 [
-                    'raw'  => __( 'Insira seu código JS personalizado', 'converto-modelos' ),
+                    'raw'  => __( 'Insira seu código JavaScript personalizado', 'converto-modelos' ),
                     'type' => Controls_Manager::RAW_HTML,
                 ]
             );
@@ -53,7 +53,7 @@ class ConvertoCustomJs {
                     'type'        => Controls_Manager::CODE,
                     'label'       => __( 'JS', 'converto-modelos' ),
                     'language'    => 'javascript',
-                    'render_type' => 'ui',
+                    'render_type' => 'none',
                     'show_label'  => false,
                     'separator'   => 'none',
                 ]
@@ -62,7 +62,7 @@ class ConvertoCustomJs {
             $element->add_control(
                 'custom_js_description',
                 [
-                    'raw'             => __( 'Use apenas código JS válido. Não inclua tags &lt;script&gt;. O código será executado no frontend.', 'converto-modelos' ),
+                    'raw'             => __( 'O código será executado dentro de uma função com acesso ao elemento atual como "selector".', 'converto-modelos' ),
                     'type'            => Controls_Manager::RAW_HTML,
                     'content_classes' => 'elementor-descriptor',
                 ]
@@ -73,88 +73,50 @@ class ConvertoCustomJs {
     }
 
     /**
-     * Cria o campo "JS Personalizado" nas configurações da página
+     * Aplica JS personalizado salvo nas configurações da página
+     * (injeção no HTML como atributo data-custom-js para o preview rodar)
      */
-    public function addPageSettingsControl( $document ) {
-        if ( ! $document::get_property( 'has_elements' ) ) {
-            return;
-        }
+    public function customJsAddPageSettings( $post_css ) {
+        $document   = \Elementor\Plugin::$instance->documents->get( $post_css->get_post_id() );
+        if ( ! $document ) return;
 
-        $document->start_controls_section(
-            'section_custom_js',
-            [
-                'label' => __( 'JS Personalizado', 'converto-modelos' ),
-                'tab'   => Controls_Manager::TAB_SETTINGS,
-            ]
-        );
+        $custom_js = trim( $document->get_settings( 'custom_js' ) );
+        if ( empty( $custom_js ) ) return;
 
-        $document->add_control(
-            'custom_js',
-            [
-                'type'        => Controls_Manager::CODE,
-                'label'       => 'JS',
-                'language'    => 'javascript',
-                'rows'        => 12,
-                'show_label'  => false,
-                'render_type' => 'ui',
-            ]
-        );
-
-        $document->end_controls_section();
+        add_filter( 'elementor/frontend/the_content', function( $content ) use ( $custom_js ) {
+            $encoded = base64_encode( $custom_js );
+            return '<div data-custom-js="' . esc_attr( $encoded ) . '">' . $content . '</div>';
+        });
     }
 
     /**
-     * Injeta no rodapé o JS coletado de:
-     * - Widgets e seções
-     * - Configurações da página
+     * Injeta suporte no frontend (widgets/seções)
      */
-    public function printCollectedJs() {
-        if ( is_admin() && ! defined( 'ELEMENTOR_PREVIEW_DOING_AJAX' ) ) {
-            return; // não roda no admin normal
-        }
+    public function enqueueFrontend() {
+        ?>
+        <script>
+        (function($){
+            "use strict";
 
-        $document_id = get_the_ID();
-        if ( ! $document_id ) {
-            return;
-        }
+            // roda para elementos com atributo data-custom-js
+            $(function(){
+                $('[data-custom-js]').each(function(){
+                    const $el = $(this);
+                    const encoded = $el.data('custom-js');
+                    if (!encoded) return;
 
-        $elementor_data = get_post_meta( $document_id, '_elementor_data', true );
-        $page_settings  = get_post_meta( $document_id, '_elementor_page_settings', true );
-
-        $scripts = [];
-
-        // 🔹 Coleta JS dos elementos
-        if ( $elementor_data ) {
-            $data = json_decode( $elementor_data, true );
-            $this->walkElementsForJs( $data, $scripts );
-        }
-
-        // 🔹 Coleta JS da página
-        if ( ! empty( $page_settings['custom_js'] ) ) {
-            $scripts[] = $page_settings['custom_js'];
-        }
-
-        // 🔹 Imprime no rodapé
-        if ( ! empty( $scripts ) ) {
-            echo "<script id='converto-custom-js'>\n";
-            foreach ( $scripts as $script ) {
-                echo $script . "\n";
-            }
-            echo "</script>";
-        }
-    }
-
-    /**
-     * Walker recursivo para coletar custom_js de todos os elementos
-     */
-    private function walkElementsForJs( $elements, &$scripts ) {
-        foreach ( $elements as $el ) {
-            if ( ! empty( $el['settings']['custom_js'] ) ) {
-                $scripts[] = $el['settings']['custom_js'];
-            }
-            if ( ! empty( $el['elements'] ) && is_array( $el['elements'] ) ) {
-                $this->walkElementsForJs( $el['elements'], $scripts );
-            }
-        }
+                    try {
+                        const code = atob(encoded);
+                        (function(selector,$){
+                            eval(code);
+                        })($el, jQuery);
+                    } catch (e) {
+                        console.error("Erro no Custom JS:", e);
+                    }
+                });
+            });
+        })(jQuery);
+        </script>
+        <?php
     }
 }
