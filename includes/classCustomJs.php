@@ -2,26 +2,25 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 use Elementor\Controls_Manager;
-use Elementor\Core\DynamicTags\Dynamic_CSS;
 
 class ConvertoCustomJs {
 
     public function __construct() {
-        // Adiciona controles de JS em widgets/seções
+        // Aba "JS Personalizado"
         add_action( 'elementor/element/after_section_end', [ $this, 'customJsControlSection' ], 20, 3 );
 
-        // Processa JS dos elementos individuais
-        add_action( 'elementor/element/parse_css', [ $this, 'customJsAddElement' ], 20, 2 );
+        // Injetar atributo nos elementos no frontend
+        add_action( 'elementor/frontend/element/before_render', [ $this, 'injectElementJsAttr' ] );
 
-        // Processa JS da página
-        add_action( 'elementor/css-file/post/parse', [ $this, 'customJsAddPageSettings' ] );
+        // Injetar atributo para page settings
+        add_action( 'elementor/frontend/before_render', [ $this, 'injectPageJsAttr' ] );
 
-        // Executa JS no frontend
-        add_action( 'elementor/frontend/after_enqueue_scripts', [ $this, 'enqueueFrontend' ] );
+        // Script executor no frontend
+        add_action( 'wp_footer', [ $this, 'enqueueFrontend' ], 99 );
     }
 
     /**
-     * Cria aba "JS Personalizado"
+     * Adiciona a aba "JS" no painel do Elementor
      */
     public function customJsControlSection( $element, $section_id, $args ) {
         if ( $section_id === 'section_custom_css' ) {
@@ -50,36 +49,32 @@ class ConvertoCustomJs {
     }
 
     /**
-     * Salva JS personalizado nos widgets/seções
+     * Injeta o atributo data-custom-js nos elementos individuais
      */
-    public function customJsAddElement( $post_css, $element ) {
-        $settings = $element->get_settings();
+    public function injectElementJsAttr( $element ) {
+        $settings = $element->get_settings_for_display();
         if ( empty( $settings['custom_js'] ) ) return;
 
         $custom_js = trim( $settings['custom_js'] );
         if ( empty( $custom_js ) ) return;
 
-        // injeta como atributo para o frontend rodar
         $element->add_render_attribute( '_wrapper', 'data-custom-js', base64_encode( $custom_js ) );
     }
 
     /**
-     * Salva JS personalizado nas configs da página
+     * Injeta para page settings
      */
-    public function customJsAddPageSettings( $post_css ) {
-        $document   = \Elementor\Plugin::$instance->documents->get( $post_css->get_post_id() );
-        $custom_js  = trim( $document->get_settings( 'custom_js' ) );
+    public function injectPageJsAttr( $element ) {
+        if ( ! method_exists( $element, 'get_settings' ) ) return;
 
+        $custom_js = trim( $element->get_settings( 'custom_js' ) );
         if ( empty( $custom_js ) ) return;
 
-        add_filter( 'elementor/frontend/the_content', function( $content ) use ( $custom_js ) {
-            $encoded = base64_encode( $custom_js );
-            return '<div data-custom-js="' . esc_attr( $encoded ) . '">' . $content . '</div>';
-        });
+        echo '<div data-custom-js="' . esc_attr( base64_encode( $custom_js ) ) . '"></div>';
     }
 
     /**
-     * Executor no frontend
+     * Script executor no frontend
      */
     public function enqueueFrontend() {
         ?>
@@ -88,11 +83,11 @@ class ConvertoCustomJs {
             "use strict";
             $(function(){
                 $('[data-custom-js]').each(function(){
-                    const $el = $(this);
-                    const encoded = $el.data('custom-js');
+                    var $el = $(this);
+                    var encoded = $el.data('custom-js');
                     if (!encoded) return;
                     try {
-                        const code = atob(encoded);
+                        var code = atob(encoded);
                         (function(selector,$){
                             eval(code);
                         })($el, jQuery);
