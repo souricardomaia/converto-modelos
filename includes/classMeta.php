@@ -18,7 +18,7 @@ class ConvertoMeta {
      * Registra o metabox nos CPTs de modelos
      */
     public function registerMetabox() {
-        $screens = ['converto_page', 'converto_section']; // seus CPTs de modelos
+        $screens = ['convertoPage', 'convertoSection']; // seus CPTs de modelos
         foreach ( $screens as $screen ) {
             add_meta_box(
                 'converto_is_pro',
